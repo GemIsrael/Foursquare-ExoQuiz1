@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foursquare Exodus Quiz</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --red: #f14a2b; --purple: #800080; --chapter-accent: #006064; --chapter-border: #ffd700;
+            --primary-gradient: linear-gradient(90deg, var(--red), var(--purple));
+            --bg-color: #f0f2f5; --text-color: #1a1a1a; --card-bg: #ffffff; --border-color: #e0e0e0;
+        }
+        [data-theme="dark"] {
+            --bg-color: #0f0f0f; --text-color: #ffffff; --card-bg: #1a1a1a; --border-color: #333; --chapter-accent: #00acc1;
+        }
+        * { box-sizing: border-box; transition: background 0.4s, color 0.4s; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; width: 100vw; overflow-x: hidden; }
+        #main-wrapper { width: 95%; max-width: 450px; position: relative; padding: 20px 0; }
+        #quiz-container { width: 100%; padding: 2.5rem 2rem; background: var(--card-bg); border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); text-align: center; position: relative; }
+        .mode-switch { position: absolute; top: -20px; left: 0; cursor: pointer; padding: 8px 12px; border-radius: 20px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-color); font-size: 0.75rem; z-index: 100; font-weight: 600; }
+        .header-logo { width: 70px; margin-bottom: 1rem; }
+        .btn { background: var(--primary-gradient); color: white; border: none; padding: 16px; border-radius: 14px; font-weight: 700; cursor: pointer; width: 110%; margin-top: 12px; font-size: 1rem; margin-left:-5%; }
+        input { width: 110%; padding: 14px; margin: 10px 0; margin-left:-5%; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); font-size: 1rem; outline: none; }
+        .chapter-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0; }
+        .chapter-opt { background: var(--card-bg); border: 3px solid var(--chapter-border); color: var(--chapter-accent); padding: 18px; border-radius: 16px; cursor: pointer; font-weight: 800; font-size: 1.2rem; }
+        .option { background: var(--bg-color); border: 2px solid transparent; padding: 14px; margin: 10px 0; border-radius: 14px; cursor: pointer; text-align: left; font-size: 0.9rem; font-weight: 500; width:110%; margin-left:-5%;}
+        .option.correct { border-color: #2ecc71 !important; background: rgba(46, 204, 113, 0.1); }
+        .option.wrong { border-color: #e74c3c !important; background: rgba(231, 76, 60, 0.1); }
+        #explanation-modal { margin-top: 12px; padding: 15px; font-size: 0.85rem; border-left: 5px solid var(--red); background: rgba(241, 74, 43, 0.08); text-align: left; border-radius: 0 10px 10px 0; width:110%; margin-left:-5%;}
+        .hidden { display: none !important; }
+        #chapter-header { font-weight: 800; color: var(--red); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; font-size: 0.9rem; }
+        .progress-bar-bg { height: 8px; background: var(--border-color); border-radius: 10px; overflow: hidden; margin-top: 20px; }
+        .progress-bar-fill { height: 100%; background: var(--primary-gradient); width: 0%; transition: width 0.4s; }
+    </style>
+</head>
+<body>
+
+    <div id="main-wrapper">
+        <button class="mode-switch" onclick="toggleTheme()">🌓 Mode</button>
+        <div id="quiz-container">
+            <div id="screen-welcome">
+                <img src="https://i.ibb.co/0HD9vg8/pngwing-com-1.png" class="header-logo">
+                <h1 style="margin: 0;">Welcome</h1>
+                <h2 style="color:var(--red); font-size: 1.2rem; margin: 5px 0;">Foursquare Exodus Quiz</h2>
+                <p style="font-size: 0.7rem; line-height: 1.5; opacity: 0.8; padding: 0 15px;">
+                    Test your biblical knowledge on Exodus Chapters 1-6. 20 real Bible questions per chapter.
+                </p>
+                <button class="btn" onclick="nextScreen('screen-info')">Start Quiz</button>
+            </div>
+
+            <div id="screen-info" class="hidden">
+                <h2>Profile Details</h2>
+                <input type="text" id="user-name" placeholder="Full Name">
+                <input type="text" id="user-district" placeholder="District">
+                <button class="btn" onclick="validateInfo()">Continue</button>
+            </div>
+ <div id="screen-chapters" class="hidden">
+                <h2>Select Chapter</h2>
+                <div class="chapter-grid" id="chapter-btns"></div>
+            </div>
+
+            <div id="screen-quiz" class="hidden">
+                <div id="chapter-header"></div>
+                <h3 id="question-text" style="margin-top: 5px; min-height: 60px;"></h3>
+                <div id="options-container"></div>
+                <div id="explanation-modal" class="hidden"></div>
+                <button class="btn hidden" id="next-btn" onclick="nextQuestion()"></button>
+                <div class="progress-bar-bg"><div id="progress-bar-fill" class="progress-bar-fill"></div></div>
+                <p id="question-indicator" style="font-size: 0.8rem; margin-top: 8px; opacity: 0.7;"></p>
+            </div>
+
+            <div id="screen-result" class="hidden">
+                <div id="result-card-wrap" style="padding: 10px;">
+                    <div id="result-card" style="background:var(--primary-gradient); padding:35px 20px; color:white; border-radius:20px; text-align: center; position: relative;">
+                        <img src="https://i.ibb.co/0HD9vg8/pngwing-com-1.png" style="width: 35px; filter: brightness(0) invert(1); margin-bottom: 10px;">
+                        <div style="font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px;">Foursquare Exodus Quiz</div>
+                        <h2 id="res-name" style="margin: 15px 0 2px 0; font-size: 1.6rem;"></h2>
+                        <div id="res-district" style="opacity: 0.9; font-size: 0.9rem; font-weight: 600; margin-bottom: 20px;"></div>
+                        <div style="margin: 20px 0;">
+                            <h1 id="score-percent" style="font-size: 4.5rem; margin: 0; line-height: 1;">0%</h1>
+                            <div id="res-chapter-tag" style="font-size: 0.85rem; margin-top: 10px; font-weight: 600; background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 12px; border-radius: 20px;"></div>
+                        </div>
+                        <p id="res-status" style="font-weight: 800; text-transform: uppercase; font-size: 0.9rem; border: 2px solid white; display: inline-block; padding: 10px 20px; border-radius: 10px; margin-top: 10px;"></p>
+                    </div>
+                </div>
+                <button class="btn" onclick="showReview()">🔍 Review Answers</button>
+                <button class="btn" onclick="downloadResult()" style="background:#333">💾 Save Scorecard</button>
+                <button class="btn" onclick="location.reload()" style="background:gray">🔄 Main Menu</button>
+            </div>
+
+            <div id="screen-review" class="hidden">
+                <h2>Review</h2>
+                <div id="review-list" style="max-height: 400px; overflow-y: auto; text-align: left; padding-right: 5px;"></div>
+                <button class="btn" onclick="nextScreen('screen-result')">Back to Score</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // SOUND EFFECTS
+        const correctSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3');
+        // --- AUDIO CONFIGURATION ---
+        
+// High-quality buzzer for wrong answers
+const wrongSound = new Audio('https://www.myinstants.com/media/sounds/soft-error.mp3');
+
+
+
+
+
+
+        // COMPLETE BIBLE DATA (Full Chapters 1-6)
+        const bibleData = {
+            1: [
+                { q: "How many souls of Jacob came into Egypt?", options: ["70", "50", "12", "100"], correct: "70", info: "Exodus 1:5 - All the souls were seventy." },
+                { q: "What were the names of the treasure cities built for Pharaoh?", options: ["Pithom and Raamses", "Cairo and Giza", "Goshen and Memphis", "Thebes and Alexandria"], correct: "Pithom and Raamses", info: "Exodus 1:11 - They built Pithom and Raamses." },
+                { q: "What were the names of the Hebrew midwives?", options: ["Shiphrah and Puah", "Miriam and Leah", "Sarah and Hagar", "Ruth and Orpah"], correct: "Shiphrah and Puah", info: "Exodus 1:15 - Their names were Shiphrah and Puah." },
+                { q: "The Egyptians made the Israelites serve with...?", options: ["Rigour", "Joy", "Kindness", "Fairness"], correct: "Rigour", info: "Exodus 1:13 - They served with rigour." },
+                { q: "Pharaoh commanded every Hebrew son be cast into...?", options: ["The River", "The Pit", "The Fire", "The Sea"], correct: "The River", info: "Exodus 1:22 - Cast every son into the river." },
+                { q: "Materials used to make Israelites' lives bitter?", options: ["Morter and Brick", "Wood and Stone", "Iron and Brass", "Gold and Silver"], correct: "Morter and Brick", info: "Exodus 1:14 - Bitter with hard bondage in morter and brick." },
+                { q: "Why did the midwives spare the children?", options: ["They feared God", "They liked the babies", "They were lazy", "They forgot the order"], correct: "They feared God", info: "Exodus 1:17 - The midwives feared God." },
+                { q: "What did God give the midwives for fearing Him?", options: ["Houses", "Gold", "Land", "Cattle"], correct: "Houses", info: "Exodus 1:21 - He made them houses." },
+                { q: "Who was the new King of Egypt afraid of?", options: ["Children of Israel", "Midianites", "Assyrians", "Philistines"], correct: "Children of Israel", info: "Exodus 1:9 - Behold, the people of Israel are mightier than we." },
+                { q: "How did the Israelites respond to affliction?", options: ["Multiplied and grew", "Died off", "Rebelled with swords", "Fled Egypt"], correct: "Multiplied and grew", info: "Exodus 1:12 - The more they afflicted them, the more they multiplied." },
+                { q: "Joseph and his brethren all died, but Israel...?", options: ["Increased abundantly", "Diminished", "Left for Canaan", "Slept in caves"], correct: "Increased abundantly", info: "Exodus 1:7 - They were fruitful and increased abundantly." },
+                { q: "Pharaoh said the Israelites were _____ than the Egyptians?", options: ["More and mightier", "Weaker", "Fewer", "Slower"], correct: "More and mightier", info: "Exodus 1:9 - They are more and mightier than we." },
+                { q: "Pharaoh wanted to deal _____ with Israel?", options: ["Wisely", "Cruelly", "Fairly", "Slowly"], correct: "Wisely", info: "Exodus 1:10 - Let us deal wisely with them." },
+                { q: "Taskmasters were set over them to afflict them with...?", options: ["Burdens", "Laughter", "Lessons", "Food"], correct: "Burdens", info: "Exodus 1:11 - To afflict them with their burdens." },
+                { q: "The Egyptians were _____ because of the children of Israel?", options: ["Grieved", "Happy", "Indifferent", "Confused"], correct: "Grieved", info: "Exodus 1:12 - They were grieved because of the children of Israel." },
+                { q: "The midwives told Pharaoh Hebrew women are not as _____ women?", options: ["Egyptian", "Midianite", "Canaanite", "Philistine"], correct: "Egyptian", info: "Exodus 1:19 - They are not as the Egyptian women." },
+                { q: "The midwives said Hebrew women are _____?", options: ["Lively", "Slow", "Sickly", "Angry"], correct: "Lively", info: "Exodus 1:19 - For they are lively." },
+                { q: "God dealt _____ with the midwives?", options: ["Well", "Hardly", "Unfairly", "Quietly"], correct: "Well", info: "Exodus 1:20 - Therefore God dealt well with the midwives." },
+                { q: "What did Pharaoh command his people to save?", options: ["Every daughter", "Every son", "Every animal", "Every crop"], correct: "Every daughter", info: "Exodus 1:22 - Every daughter ye shall save alive." },
+                { q: "Did the midwives do as the King commanded?", options: ["No", "Yes", "Only half", "Sometimes"], correct: "No", info: "Exodus 1:17 - They did not as the king commanded." }
+            ],
+            2: [
+                { q: "Moses' father and mother were of which tribe?", options: ["Levi", "Judah", "Benjamin", "Reuben"], correct: "Levi", info: "Ex 2:1 - A man of the house of Levi took a daughter of Levi." },
+                { q: "How long was baby Moses hidden?", options: ["3 months", "1 month", "6 months", "1 year"], correct: "3 months", info: "Ex 2:2 - She hid him three months." },
+                { q: "What was the ark Moses was placed in made of?", options: ["Bulrushes", "Cedar", "Acacia", "Gold"], correct: "Bulrushes", info: "Ex 2:3 - An ark of bulrushes daubed with slime." },
+                { q: "Who watched the baby from afar?", options: ["His sister", "His father", "A midwife", "A servant"], correct: "His sister", info: "Ex 2:4 - His sister stood afar off." },
+                { q: "Who found Moses in the river?", options: ["Pharaoh's daughter", "A fisherman", "Pharaoh", "The Queen"], correct: "Pharaoh's daughter", info: "Ex 2:5 - Pharaoh's daughter saw the ark." },
+                { q: "Why did she name him Moses?", options: ["Drawn out of water", "Saved by God", "Beautiful child", "Prince of Egypt"], correct: "Drawn out of water", info: "Ex 2:10 - Because I drew him out of the water." },
+                { q: "Who nursed Moses for Pharaoh's daughter?", options: ["His own mother", "An Egyptian", "A Midianite", "A slave"], correct: "His own mother", info: "Ex 2:7-9 - She called the child's mother." },
+                { q: "Why did Moses flee Egypt?", options: ["He killed an Egyptian", "He stole gold", "He was bored", "He feared a plague"], correct: "He killed an Egyptian", info: "Ex 2:12-15 - He slew the Egyptian and fled." },
+                { q: "Where did Moses flee to?", options: ["Midian", "Canaan", "Sinai", "Ethiopia"], correct: "Midian", info: "Ex 2:15 - Moses dwelt in the land of Midian." },
+                { q: "The priest of Midian had how many daughters?", options: ["7", "3", "12", "1"], correct: "7", info: "Ex 2:16 - The priest had seven daughters." },
+                { q: "What was the priest of Midian's name in Ch 2?", options: ["Reuel", "Jethro", "Balaam", "Laban"], correct: "Reuel", info: "Ex 2:18 - They came to Reuel their father." },
+                { q: "Who was Moses' wife?", options: ["Zipporah", "Miriam", "Leah", "Rachel"], correct: "Zipporah", info: "Ex 2:21 - He gave Moses Zipporah his daughter." },
+                { q: "Moses' first son's name was?", options: ["Gershom", "Isaac", "Eliezer", "Jacob"], correct: "Gershom", info: "Ex 2:22 - He called his name Gershom." },
+                { q: "Gershom means I have been a _____ in a strange land?", options: ["Stranger", "King", "Soldier", "Slave"], correct: "Stranger", info: "Ex 2:22 - I have been a stranger in a strange land." },
+                { q: "Who died while Moses was in Midian?", options: ["King of Egypt", "Aaron", "Miriam", "Reuel"], correct: "King of Egypt", info: "Ex 2:23 - The king of Egypt died." },
+                { q: "What came up to God because of the bondage?", options: ["Their cry", "Their laughter", "Their song", "Their silence"], correct: "Their cry", info: "Ex 2:23 - Their cry came up unto God." },
+                { q: "God remembered His covenant with whom?", options: ["Abraham, Isaac, Jacob", "Noah", "Adam", "Moses"], correct: "Abraham, Isaac, Jacob", info: "Ex 2:24 - God remembered His covenant." },
+                { q: "Did God have respect for the children of Israel?", options: ["Yes", "No", "Maybe", "Not yet"], correct: "Yes", info: "Ex 2:25 - God had respect unto them." },
+                { q: "Moses defended the daughters at a...?", options: ["Well", "Temple", "House", "Mountain"], correct: "Well", info: "Ex 2:15-17 - He stood up and helped them at the well." },
+                { q: "Pharaoh sought to _____ Moses after the murder?", options: ["Slay", "Exile", "Reward", "Crown"], correct: "Slay", info: "Ex 2:15 - Pharaoh sought to slay Moses." }
+            ],
+            3: [
+                { q: "What was Moses' job when God called him?", options: ["Shepherd", "Fisherman", "King", "Stone Mason"], correct: "Shepherd", info: "Ex 3:1 - He kept the flock of Jethro." },
+                { q: "What was the name of the Mountain of God?", options: ["Horeb", "Sinai", "Nebo", "Carmel"], correct: "Horeb", info: "Ex 3:1 - He came to the mountain of God, Horeb." },
+                { q: "How did God appear in the bush?", options: ["Flame of fire", "In a cloud", "As a man", "In a whisper"], correct: "Flame of fire", info: "Ex 3:2 - The angel appeared in a flame of fire." },
+                { q: "The bush was burning, but it was not _____?", options: ["Consumed", "Hot", "Bright", "Real"], correct: "Consumed", info: "Ex 3:2 - The bush was not consumed." },
+                { q: "What did God tell Moses to take off?", options: ["Shoes", "Staff", "Robe", "Hat"], correct: "Shoes", info: "Ex 3:5 - Put off thy shoes from off thy feet." },
+                { q: "The place where Moses stood was _____?", options: ["Holy Ground", "Forbidden", "Dangerous", "Empty"], correct: "Holy Ground", info: "Ex 3:5 - For the place is holy ground." },
+                { q: "God said the land flows with...?", options: ["Milk and Honey", "Gold and Silver", "Wine and Oil", "Bread and Water"], correct: "Milk and Honey", info: "Ex 3:8 - Unto a land flowing with milk and honey." },
+                { q: "What name did God give Moses for the people?", options: ["I AM THAT I AM", "The Almighty", "The Creator", "Jehovah"], correct: "I AM THAT I AM", info: "Ex 3:14 - God said: I AM THAT I AM." },
+                { q: "How many days' journey did they request?", options: ["3 days", "7 days", "1 day", "40 days"], correct: "3 days", info: "Ex 3:18 - Let us go three days' journey." },
+                { q: "What did the women borrow from the Egyptians?", options: ["Jewels of gold and silver", "Food", "Clothes", "Animals"], correct: "Jewels of gold and silver", info: "Ex 3:22 - Borrow jewels of silver and gold." },
+                { q: "Did Moses hide his face at the bush?", options: ["Yes", "No", "He closed eyes", "He looked away"], correct: "Yes", info: "Ex 3:6 - Moses hid his face; he was afraid." },
+                { q: "Who did God see being oppressed?", options: ["His people", "Egyptians", "Midianites", "Angels"], correct: "His people", info: "Ex 3:7 - I have seen the affliction of my people." },
+                { q: "Where was Moses to bring the people?", options: ["This mountain", "Midian", "Canaan", "Assyria"], correct: "This mountain", info: "Ex 3:12 - Ye shall serve God upon this mountain." },
+                { q: "What was Moses' first response to the call?", options: ["Who am I?", "I am ready", "No way", "Let me think"], correct: "Who am I?", info: "Ex 3:11 - Who am I, that I should go?" },
+                { q: "The Lord said He would _____ the Egyptians?", options: ["Smite", "Bless", "Ignore", "Warn"], correct: "Smite", info: "Ex 3:20 - I will stretch out my hand and smite Egypt." },
+                { q: "Would they go out of Egypt empty?", options: ["No", "Yes", "Maybe", "Only the men"], correct: "No", info: "Ex 3:21 - Ye shall not go empty." },
+                { q: "Whose flock was Moses keeping?", options: ["Jethro's", "His own", "Pharaoh's", "Reuel's"], correct: "Jethro's", info: "Ex 3:1 - He kept the flock of Jethro his father in law." },
+                { q: "God told Moses he would _____ the Egyptians?", options: ["Spoil", "Serve", "Teach", "Feed"], correct: "Spoil", info: "Ex 3:22 - And ye shall spoil the Egyptians." },
+                { q: "The Lord called Moses out of the _____?", options: ["Midst of the bush", "Cloud", "Mountain", "River"], correct: "Midst of the bush", info: "Ex 3:4 - God called him out of the midst of the bush." },
+                { q: "God said He remembered His _____ with Abraham?", options: ["Covenant", "Promise", "Oath", "Meeting"], correct: "Covenant", info: "Ex 2:24 - God remembered his covenant." }
+            ],
+            4: [
+                { q: "What did Moses' rod turn into?", options: ["Serpent", "River", "Sword", "Lion"], correct: "Serpent", info: "Ex 4:3 - It became a serpent." },
+                { q: "Moses' hand became _____ as snow?", options: ["Leprous", "White", "Strong", "Golden"], correct: "Leprous", info: "Ex 4:6 - His hand was leprous as snow." },
+                { q: "Who was Moses' spokesman?", options: ["Aaron", "Joshua", "Caleb", "Jethro"], correct: "Aaron", info: "Ex 4:14 - Is not Aaron the Levite thy brother?" },
+                { q: "Aaron was of which tribe?", options: ["Levite", "Judah", "Dan", "Gad"], correct: "Levite", info: "Ex 4:14 - Aaron the Levite." },
+                { q: "What did Moses take in his hand to Egypt?", options: ["The Rod of God", "Gold", "A Sword", "A Map"], correct: "The Rod of God", info: "Ex 4:20 - Moses took the rod of God." },
+                { q: "God said Israel is His _____?", options: ["Firstborn", "Servant", "Army", "Friend"], correct: "Firstborn", info: "Ex 4:22 - Israel is my son, even my firstborn." },
+                { q: "Where did Aaron meet Moses?", options: ["Mount of God", "The Nile", "Midian", "Goshen"], correct: "Mount of God", info: "Ex 4:27 - Met him in the mount of God." },
+                { q: "What did Zipporah use to circumcise her son?", options: ["Sharp stone", "Iron knife", "Bronze sword", "Wood"], correct: "Sharp stone", info: "Ex 4:25 - Zipporah took a sharp stone." },
+                { q: "Did the elders of Israel believe Moses?", options: ["Yes", "No", "Some did", "They laughed"], correct: "Yes", info: "Ex 4:31 - And the people believed." },
+                { q: "God asked: Who hath made man's _____?", options: ["Mouth", "Hands", "Eyes", "Heart"], correct: "Mouth", info: "Ex 4:11 - Who hath made man's mouth?" },
+                { q: "What was the third sign (water to...)?", options: ["Blood", "Wine", "Ice", "Salt"], correct: "Blood", info: "Ex 4:9 - Water shall become blood upon dry land." },
+                { q: "Moses said he was not _____?", options: ["Eloquent", "Strong", "Young", "Brave"], correct: "Eloquent", info: "Ex 4:10 - I am not eloquent." },
+                { q: "Who met Moses in the mount of God?", options: ["Aaron", "Pharaoh", "Jethro", "Miriam"], correct: "Aaron", info: "Ex 4:27 - Aaron went and met him." },
+                { q: "What did the people do when they heard God visited them?", options: ["Bowed and worshipped", "Sang songs", "Prepared for war", "Fled"], correct: "Bowed and worshipped", info: "Ex 4:31 - They bowed their heads and worshipped." },
+                { q: "God said He would harden whose heart?", options: ["Pharaoh's", "Moses'", "Aaron's", "The elders'"], correct: "Pharaoh's", info: "Ex 4:21 - I will harden his heart." },
+                { q: "Who did Moses ask permission from to leave?", options: ["Jethro", "Pharaoh", "Reuel", "God"], correct: "Jethro", info: "Ex 4:18 - Moses went and returned to Jethro." },
+                { q: "Did God say He would kill Pharaoh's firstborn?", options: ["Yes", "No", "Only if he lied", "Eventually"], correct: "Yes", info: "Ex 4:23 - I will slay thy son, even thy firstborn." },
+                { q: "What did Moses put his hand into to make it leprous?", options: ["His bosom", "The river", "The fire", "The sand"], correct: "His bosom", info: "Ex 4:6 - Put now thine hand into thy bosom." },
+                { q: "Moses said he was slow of speech and of a slow _____?", options: ["Tongue", "Mind", "Heart", "Hand"], correct: "Tongue", info: "Ex 4:10 - I am slow of speech and of a slow tongue." },
+                { q: "The Lord met Moses in the _____ on his way to Egypt?", options: ["Inn", "Desert", "Temple", "House"], correct: "Inn", info: "Ex 4:24 - The Lord met him in the inn." }
+            ],
+            5: [
+                { q: "What did Moses and Aaron say to Pharaoh?", options: ["Let my people go", "Give us gold", "We are kings", "Surrender"], correct: "Let my people go", info: "Ex 5:1 - Thus saith the Lord: Let my people go." },
+                { q: "Pharaoh's said: Who is the _____, that I should obey?", options: ["Lord", "Moses", "God of Israel", "King"], correct: "Lord", info: "Ex 5:2 - Who is the Lord, that I should obey?" },
+                { q: "Pharaoh stopped giving them _____ for bricks?", options: ["Straw", "Water", "Clay", "Tools"], correct: "Straw", info: "Ex 5:7 - Ye shall no more give the people straw." },
+                { q: "Pharaoh called the Israelites _____?", options: ["Idle", "Rebellious", "Strong", "Many"], correct: "Idle", info: "Ex 5:17 - Ye are idle, ye are idle." },
+                { q: "The _____ of Israel were beaten?", options: ["Officers", "Children", "Women", "Kings"], correct: "Officers", info: "Ex 5:14 - The officers were beaten." },
+                { q: "Did the brick quota decrease without straw?", options: ["No", "Yes", "Half", "It doubled"], correct: "No", info: "Ex 5:8 - The tale of bricks... ye shall not diminish." },
+                { q: "Who did the officers blame?", options: ["Moses and Aaron", "Pharaoh", "God", "Themselves"], correct: "Moses and Aaron", info: "Ex 5:21 - The Lord look upon you and judge." },
+                { q: "Moses asked God: Why hast Thou so _____ entreated this people?", options: ["Evil", "Good", "Slowly", "Kindly"], correct: "Evil", info: "Ex 5:22 - Why hast thou so evil entreated this people?" },
+                { q: "Pharaoh said: Let there more _____ be laid upon the men?", options: ["Work", "Gold", "Food", "Cloth"], correct: "Work", info: "Ex 5:9 - Let there more work be laid upon the men." },
+                { q: "Did Pharaoh know the Lord?", options: ["No", "Yes", "Only by name", "He was a believer"], correct: "No", info: "Ex 5:2 - I know not the Lord." },
+                { q: "Where were they to get straw?", options: ["Gather it themselves", "Buy it", "From Pharaoh", "From the Nile"], correct: "Gather it themselves", info: "Ex 5:12 - Scattered to gather stubble for straw." },
+                { q: "What did they gather instead of straw?", options: ["Stubble", "Leaves", "Sand", "Wood"], correct: "Stubble", info: "Ex 5:12 - To gather stubble instead of straw." },
+                { q: "Pharaoh said Moses and Aaron _____ the people from works?", options: ["Let (hinder)", "Help", "Teach", "Encourage"], correct: "Let (hinder)", info: "Ex 5:4 - Wherefore do ye let the people from their works?" },
+                { q: "Taskmasters said: Fulfill your works, your daily _____?", options: ["Tasks", "Bricks", "Straw", "Songs"], correct: "Tasks", info: "Ex 5:13 - Fulfill your works, your daily tasks." },
+                { q: "The officers met Moses and Aaron as they came from _____?", options: ["Pharaoh", "The field", "Midian", "Prayer"], correct: "Pharaoh", info: "Ex 5:20 - They met Moses and Aaron... as they came forth from Pharaoh." },
+                { q: "Officers said Moses made their savour to be _____ in Pharaoh's eyes?", options: ["Abhorred", "Loved", "Sweet", "Forgotten"], correct: "Abhorred", info: "Ex 5:21 - Ye have made our savour to be abhorred." },
+                { q: "Since Moses came to Pharaoh, has he delivered the people?", options: ["No", "Yes", "Partially", "In secret"], correct: "No", info: "Ex 5:23 - Neither hast thou delivered thy people at all." },
+                { q: "The people were scattered throughout all the land of _____?", options: ["Egypt", "Goshen", "Canaan", "Midian"], correct: "Egypt", info: "Ex 5:12 - Scattered abroad throughout all the land of Egypt." },
+                { q: "The taskmasters and officers were _____?", options: ["Hasty", "Kind", "Patient", "Lazy"], correct: "Hasty", info: "Ex 5:13 - And the taskmasters hasted them." },
+                { q: "Who were the taskmasters?", options: ["Egyptians", "Israelites", "Midianites", "Pharaoh's sons"], correct: "Egyptians", info: "Ex 5:13-14 - Context: Egyptian taskmasters over Israelite officers." }
+            ],
+            6: [
+                { q: "God said He appeared to Abraham by which name?", options: ["God Almighty", "Jehovah", "The Word", "Jesus"], correct: "God Almighty", info: "Ex 6:3 - By the name of God Almighty." },
+                { q: "God said by which name was He NOT known to them?", options: ["Jehovah", "God Almighty", "The Creator", "Elohim"], correct: "Jehovah", info: "Ex 6:3 - By my name JEHOVAH was I not known." },
+                { q: "God promised to bring them out from under _____?", options: ["Burdens", "Shadows", "Kings", "Clouds"], correct: "Burdens", info: "Ex 6:6 - Out from under the burdens of the Egyptians." },
+                { q: "God promised to redeem them with a stretched out _____?", options: ["Arm", "Hand", "Rod", "Sword"], correct: "Arm", info: "Ex 6:6 - Redeem you with a stretched out arm." },
+                { q: "God will take you to Me for a _____?", options: ["People", "Army", "Slave", "Worker"], correct: "People", info: "Ex 6:7 - I will take you to me for a people." },
+                { q: "Why did the people not listen to Moses?", options: ["Anguish of spirit", "They were deaf", "They hated him", "They were busy"], correct: "Anguish of spirit", info: "Ex 6:9 - For anguish of spirit and cruel bondage." },
+                { q: "Moses said he was of _____ lips?", options: ["Uncircumcised", "Stammering", "Slow", "Wicked"], correct: "Uncircumcised", info: "Ex 6:12 - Who am I of uncircumcised lips?" },
+                { q: "How many years did Levi live?", options: ["137", "110", "120", "147"], correct: "137", info: "Ex 6:16 - The years of the life of Levi were 137." },
+                { q: "Who was the father of Moses and Aaron?", options: ["Amram", "Izhar", "Hebron", "Uzziel"], correct: "Amram", info: "Ex 6:20 - Amram took him Jochebed... she bare Aaron and Moses." },
+                { q: "Who was Moses' mother?", options: ["Jochebed", "Sarah", "Zipporah", "Miriam"], correct: "Jochebed", info: "Ex 6:20 - Amram took Jochebed his father's sister." },
+                { q: "How many years did Amram live?", options: ["137", "120", "100", "110"], correct: "137", info: "Ex 6:20 - The years of Amram were 137." },
+                { q: "Who was Aaron's wife?", options: ["Elisheba", "Zipporah", "Miriam", "Leah"], correct: "Elisheba", info: "Ex 6:23 - Aaron took Elisheba daughter of Amminadab." },
+                { q: "Who was Aaron's firstborn son?", options: ["Nadab", "Abihu", "Eleazar", "Ithamar"], correct: "Nadab", info: "Ex 6:23 - She bare him Nadab, Abihu, Eleazar, Ithamar." },
+                { q: "Who was the son of Eleazar?", options: ["Phinehas", "Nadab", "Korah", "Assir"], correct: "Phinehas", info: "Ex 6:25 - Eleazar's son was Phinehas." },
+                { q: "God said He would bring Israel out by their _____?", options: ["Armies", "Ships", "Families", "Flocks"], correct: "Armies", info: "Ex 6:26 - Bring the children of Israel from Egypt by their armies." },
+                { q: "Did God command Moses to speak ALL He said to Pharaoh?", options: ["Yes", "No", "Only some", "Eventually"], correct: "Yes", info: "Ex 6:29 - Speak thou unto Pharaoh... all that I say unto thee." },
+                { q: "Moses repeated: Pharaoh shall not _____ unto me?", options: ["Hearken", "Look", "Give", "Bow"], correct: "Hearken", info: "Ex 6:30 - How shall Pharaoh hearken unto me?" },
+                { q: "Who were the sons of Kohath?", options: ["Amram, Izhar, Hebron, Uzziel", "Nadab, Abihu", "Gershon, Merari", "Hanoch, Pallu"], correct: "Amram, Izhar, Hebron, Uzziel", info: "Ex 6:18 - Lists the sons of Kohath." },
+                { q: "The Lord spoke to Moses and Aaron to bring them out of the land of _____?", options: ["Egypt", "Canaan", "Midian", "Goshen"], correct: "Egypt", info: "Ex 6:13 - Spoke to bring them out of the land of Egypt." },
+                { q: "Was Jochebed Amram's father's sister?", options: ["Yes", "No", "Niece", "Cousin"], correct: "Yes", info: "Ex 6:20 - Amram took Jochebed his father's sister." }
+            ]
+        };
+
+        let currentChapter, currentQ = 0, score = 0, userSelections = [];
+
+        function toggleTheme() { document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark'; }
+        
+        function nextScreen(id) { 
+            document.querySelectorAll('#quiz-container > div').forEach(d => d.classList.add('hidden')); 
+            document.getElementById(id).classList.remove('hidden'); 
+        }
+
+        function validateInfo() {
+            if(document.getElementById('user-name').value && document.getElementById('user-district').value) { 
+                setupChapters();
+                nextScreen('screen-chapters'); 
+            } else { alert("Please enter Name and District"); }
+        }
+
+        function setupChapters() {
+            const grid = document.getElementById('chapter-btns');
+            grid.innerHTML = '';
+            for(let i=1; i<=6; i++) {
+                let d = document.createElement('div'); d.className = 'chapter-opt'; d.innerText = i;
+                d.onclick = () => { currentChapter = i; startQuiz(); };
+                grid.appendChild(d);
+            }
+        }
+
+        function startQuiz() { 
+            currentQ = 0; score = 0; userSelections = []; 
+            nextScreen('screen-quiz');
+            loadQuestion(); 
+        }
+
+        function shuffle(arr) { return arr.sort(() => Math.random() - 0.5); }
+
+        function loadQuestion() {
+            const q = bibleData[currentChapter][currentQ];
+            document.getElementById('chapter-header').innerText = `EXODUS CHAPTER ${currentChapter}`;
+            document.getElementById('question-text').innerText = q.q;
+            
+            const container = document.getElementById('options-container'); 
+            container.innerHTML = '';
+            document.getElementById('explanation-modal').classList.add('hidden');
+            
+            const nextBtn = document.getElementById('next-btn');
+            nextBtn.classList.add('hidden');
+            nextBtn.innerText = (currentQ === 19) ? "Submit Quiz" : "Next Question";
+
+            let opts = shuffle([...q.options]);
+            opts.forEach(optText => {
+                const btn = document.createElement('div'); btn.className = 'option'; btn.innerText = optText;
+                btn.onclick = () => selectOption(optText, btn);
+                container.appendChild(btn);
+            });
+
+            document.getElementById('progress-bar-fill').style.width = ((currentQ + 1) / 20 * 100) + '%';
+            document.getElementById('question-indicator').innerText = `Question ${currentQ+1} of 20`;
+        }
+
+        function selectOption(txt, el) {
+            const q = bibleData[currentChapter][currentQ];
+            const isCorrect = (txt === q.correct);
+            userSelections.push({ q: q.q, selected: txt, correct: q.correct, isCorrect });
+
+            if(isCorrect) { 
+                el.classList.add('correct'); score++; 
+                correctSound.play();
+            } else { 
+                el.classList.add('wrong');
+                wrongSound.play();
+                Array.from(document.querySelectorAll('.option')).forEach(b => { if(b.innerText === q.correct) b.classList.add('correct'); });
+            }
+
+            document.getElementById('explanation-modal').innerText = q.info;
+            document.getElementById('explanation-modal').classList.remove('hidden');
+            document.getElementById('next-btn').classList.remove('hidden');
+            document.querySelectorAll('.option').forEach(o => o.onclick = null);
+        }
+
+        function nextQuestion() {
+            if(currentQ < 19) { currentQ++; loadQuestion(); } 
+            else { showResult(); }
+        }
+
+        function showResult() {
+            nextScreen('screen-result');
+            const pct = Math.round((score/20)*100);
+            document.getElementById('res-name').innerText = document.getElementById('user-name').value;
+            document.getElementById('res-district').innerText = "District: " + document.getElementById('user-district').value;
+            document.getElementById('res-chapter-tag').innerText = "Exodus Chapter " + currentChapter;
+            document.getElementById('score-percent').innerText = pct + "%";
+            
+            let status = "";
+            if(pct >= 90) status = "🔥 Biblical Scholar";
+            else if(pct >= 70) status = "📖 Faithful Student";
+            else if(pct >= 50) status = "🙏 Growing Disciple";
+            else status = "🕯️ Keep Studying";
+            
+            document.getElementById('res-status').innerText = status;
+            
+            // CONFETTI
+            if(pct >= 50) {
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+            }
+        }
+
+        function showReview() {
+            nextScreen('screen-review');
+            const list = document.getElementById('review-list'); 
+            list.innerHTML = '';
+            userSelections.forEach((item, i) => {
+                const div = document.createElement('div'); div.style.marginBottom = "15px"; div.style.padding = "10px"; div.style.borderBottom = "1px solid var(--border-color)";
+                div.innerHTML = `<b>${i+1}. ${item.q}</b><br>
+                <span style="color:${item.isCorrect ? '#2ecc71' : '#e74c3c'}">Your Answer: ${item.selected}</span><br>
+                <span style="color:#2ecc71">Correct: ${item.correct}</span>`;
+                list.appendChild(div);
+            });
+        }
+
+        function downloadResult() {
+            html2canvas(document.getElementById('result-card-wrap'), { scale: 3, useCORS: true }).then(canvas => {
+                const link = document.createElement('a'); link.download = 'Exodus_Quiz_Scorecard.png'; link.href = canvas.toDataURL(); link.click();
+            });
+        }
+    </script>
+</body>
+</html>
